@@ -1,0 +1,4 @@
+[2014-08-26 09:43:00] [updater.App] [INFO ] ********** Rollout Integrity Client Tool **********
+[2014-08-26 09:43:00] [configuration.ConfigurationUtils] [DEBUG] ConfigurationUtils.locate(): base is C:\Users\krutulj\git\IntegrityUpdater\kj, name is rict.properties
+[2014-08-26 09:43:00] [configuration.ConfigurationUtils] [DEBUG] Loading configuration from the path C:\Users\krutulj\git\IntegrityUpdater\kj\rict.properties
+[2014-08-26 09:43:00] [updater.App] [DEBUG] Added configuration from: C:\Users\krutulj\git\IntegrityUpdater\kj\rict.properties

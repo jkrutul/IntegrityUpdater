@@ -1,11 +1,16 @@
 package com.ptc.integrity.services.utilities.updater;
 
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.sql.Timestamp;
 import java.util.Scanner;
+import java.util.regex.Pattern;
 
 import org.apache.commons.configuration.CompositeConfiguration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -73,6 +78,8 @@ public class App{
 	}
 	
     public static void main( String[] args ) {    	
+       
+         
     	Timestamp mainStart, start, stop, mainStop;
     	mainStart = new Timestamp(new java.util.Date().getTime());
     	
@@ -149,8 +156,13 @@ public class App{
     	
 
     	// pasteviewsets
+    	
     	// update viewsets
-    	replacePortsAndSettings(new File(mksDir + File.separator + "viewset" + File.separator+"user") , "localhost", "7001");
+    	try {
+			replacePortsAndSettings(new File(mksDir + File.separator + "viewset" + File.separator+"user") , "localhost", "7001");
+		} catch (IOException e) {
+			log.error(e);
+		}
     	
     	
     		
@@ -264,7 +276,18 @@ public class App{
     	}
     }
     
-    private static void replacePortsAndSettings(File dir, String hostname, String port) {
+    private static void replacePortsAndSettings(File dir, String hostname, String port) throws IOException {
+    	
+	   	 String p1 = "<Setting name=\"server.port\">";
+	   	 String p3 = "<Setting name=\"server.hostname\">";
+	   	 String p2 = "</Setting>";
+	   	 
+	   	 String hostSetting = p3 + hostname + p2;
+	   	 String portSetting = p1 + port +p2;
+	   	 
+	   	 String portRegex = Pattern.quote(p1) + "(.*?)"  + Pattern.quote(p2);
+	   	 String hostRegex = Pattern.quote(p3) + "(.*?)"  + Pattern.quote(p2);
+
     	if (!dir.isDirectory()) {
     		log.error("Error while replacing hostnames and ports in viewsets directory " + dir.getAbsolutePath() + " doesn't exists");
     		return;
@@ -272,20 +295,23 @@ public class App{
     	File[] arrayOfViewsets = dir.listFiles();
     	
     	for (File viewset : arrayOfViewsets) {
-
-    			Scanner sc = null;
-				try {
-					sc = new Scanner(viewset);
-				} catch (FileNotFoundException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    			
-    			while (sc.hasNextLine()) {
-    				String line = sc.nextLine();
-    				//line.replaceAll(regex, replacement)
-    			}
-     		
+    		
+    		FileInputStream fs = new FileInputStream(viewset.getAbsoluteFile());
+    		BufferedReader br = new BufferedReader(new InputStreamReader(fs));
+    		FileWriter writer = new FileWriter(viewset.getAbsoluteFile());
+    		
+    		String line = br.readLine();
+    		while (line != null) {
+    			line = line.replaceAll(portRegex, portSetting);
+    			line = line.replaceAll(hostRegex, hostSetting);
+    			writer.write(line);
+    			writer.write(System.getProperty("line.separator"));
+    			line = br.readLine();
+    		}
+    		writer.flush();
+    		writer.close();	
+    		br.close();
+    		fs.close();
     	}
     	
     	
