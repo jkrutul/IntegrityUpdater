@@ -38,13 +38,17 @@ public class WindowsUtils {
 	  }
 	
 	public static void killProcess (String taskName){
-		Process p;
+		Process p = null;
 		try {
 			String line;
-			p = Runtime.getRuntime().exec("cmd /c taskkill.exe /IM "+ taskName);
-			BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
-			while ((line = input.readLine()) != null ){
-				log.warn(line);
+			try {
+				p = Runtime.getRuntime().exec("cmd /c taskkill.exe /T /IM "+ taskName+" /F");
+				BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+				while ((line = input.readLine()) != null ){
+					log.warn(line);
+				}
+			}catch (SecurityException se) {
+				log.error(se);
 			}
 		} catch (IOException e) {
 			log.error(e);
@@ -72,11 +76,18 @@ public class WindowsUtils {
     	interruptProcessWorkAfter*=1000;
     	processCheckInterval*=1000;
     	start = new Timestamp(new java.util.Date().getTime());
-
-    	if (processParams != null){
-    		process = runTime.exec("cmd /c "+pathToProcess+" "+ processParams);
-    	} else {
-    		process = runTime.exec("cmd /c "+pathToProcess);
+    	
+    	try {
+	    	String command;
+	    	if (processParams != null){
+	    		command = "cmd /c "+pathToProcess+" "+ processParams;
+	    		process = runTime.exec(command);
+	    	} else {
+	    		command = "cmd /c "+pathToProcess;
+	    		process = runTime.exec(command);
+	    	}
+    	} catch (SecurityException se) {
+    		log.error(se);
     	}
 
     	log.info("Process: "+ pathToProcess+ " was started at: " + start);
@@ -113,15 +124,7 @@ public class WindowsUtils {
     		counter++;
     	}	
 	}
-	
-	public static void removeDirectory(File file){
-		if (file.isDirectory()){
-			file.delete();
-		} else {
-			log.error("File: "+ file.getAbsolutePath()+" can't be removed");
-		}
-	}
-	
+
 	public static boolean deleteFolder(File folder) {
 	    File[] files = folder.listFiles();
 	    if(files!=null) { //some JVMs return null for empty dirs
