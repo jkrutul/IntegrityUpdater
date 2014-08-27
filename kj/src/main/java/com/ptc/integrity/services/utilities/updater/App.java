@@ -2,15 +2,15 @@ package com.ptc.integrity.services.utilities.updater;
 
 
 import java.io.BufferedReader;
-import java.io.Console;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Timestamp;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -20,19 +20,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.configuration.SystemConfiguration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-
-import com.mks.api.CmdRunner;
-import com.mks.api.Command;
-import com.mks.api.IntegrationPoint;
-import com.mks.api.IntegrationPointFactory;
-import com.mks.api.Session;
-import com.mks.api.response.APIException;
-import com.mks.api.response.Field;
-import com.mks.api.response.Response;
-import com.mks.api.response.WorkItem;
-import com.mks.api.response.WorkItemIterator;
-import com.mks.api.util.APIVersion;
-import com.ptc.integrity.services.utilities.models.Sandbox;
 
 /**
  * Hello world!
@@ -47,7 +34,7 @@ public class App{
 	public static final String PROPERTY_SERVER_HOSTNAME = "SERVER_HOSTNAME";
 	public static final String PROPERTY_SERVER_PORT = "SERVER_PORT";
 	
-	public static String oldClientDir, installAppDir, appDir, userHome, mksDir, serverHostname, serverPort;
+	public static String oldClientDir, installAppDir, appDir, userHome, mksDir, SIDistDir, serverHostname, serverPort;
 	
 	public static CompositeConfiguration config;
 	static final Logger log = LogManager.getLogger(App.class.getName());
@@ -55,7 +42,7 @@ public class App{
 	private static int processWorkTimeLimit = 60*20;
 	private static int processCheckInterval = 10;
 	
-	private static Timestamp mainStart, mainStop;
+	private static Timestamp mainStart;
 	private static APIUtils api;
 	
 	static {
@@ -69,6 +56,7 @@ public class App{
 		appDir = System.getProperty("user.dir");
 		userHome = System.getProperty("user.home");
 		mksDir = userHome + File.separator + ".mks";
+		SIDistDir = userHome + File.separator + "SIDist";
 		
 		if (appDir != null) {
 			f = new File(appDir+File.separator+PROPERTIES_FILE);
@@ -117,94 +105,33 @@ public class App{
 		
     	
         mainStart = new Timestamp(new java.util.Date().getTime());
-        
-        /*
+
     	if( !checkProperties()) {
     		abortApp();
     	}
-    	
-    	*/
-         
-    	Timestamp start, stop;
 
-    	
     	if (WindowsUtils.ifProcessRunning("IntegrityClient.exe")) {
     		WindowsUtils.killProcess("IntegrityClient.exe");
     		log.info("Find running IntegrityClient, process will be terminated");
     	}
     	
-    	backUpMksDir();
-    	/*
-    	// UNINSTALL CLIENT
-    	try {
-        	start = new Timestamp(new java.util.Date().getTime());
-        	System.out.println("[" + start + "] Uninstalling old Integrity Client...");
-    		int exitCode = uninstallIntegrityClient();
-        	stop = new Timestamp(new java.util.Date().getTime());
-    		if (exitCode == 0){
-    			String message = "[" + stop + "] Old Integrity Client was successful uninstalled. Time duration: " +Utils.timeDuration(start, stop);
-    			WindowsUtils.deleteFolder(new File(config.getString(PROPERTY_OLD_CLIENT_DIR)));
-    			System.out.println(message);
-    			log.info(message);
-    			
-    		}else {
-    			String message = "[" + stop + "] Error occurred while uninstalling Integrity Client. Time duration: " +Utils.timeDuration(start, stop);
-    			System.out.println(message);
-    			log.error(message);
-    			//abortApp(); //TODO uncomment
-    		}
-		} catch (IOException e) {
-			log.error(e);
-			log.error("Please check if \""+PROPERTY_OLD_CLIENT_DIR+"\" property is properly set and points to OLD IntegrityClient dir");
-		}
+    	backUpMksDirs();
+    	uninstallIntegrityClient();
+    	installNewIntegrityClient();
     	
-    	File oldClientDir = new File(config.getString(PROPERTY_OLD_CLIENT_DIR));
-    	if (oldClientDir!= null && oldClientDir.isDirectory()) {
-    		if (WindowsUtils.deleteFolder(oldClientDir)) {
-    			log.info("Old client directory ["+oldClientDir.getAbsolutePath()+"] was removed");
-    		} else {
-    			log.warn("Cannot delete Old Client directory ["+oldClientDir.getAbsolutePath()+"]" );
-    		}
-    	}
 
-    	
-    	// INSTALL NEW CLIENT
-    	try {
-        	start = new Timestamp(new java.util.Date().getTime());
-        	System.out.println("[" + start + "] Installing new Integrity Client...");
-    		int exitCode = installNewIntegrityClient();
-        	stop = new Timestamp(new java.util.Date().getTime());
-    		if (exitCode == 0){
-    			String message = "[" + stop + "] New Integrity Client was successful installed. Time duration: " +Utils.timeDuration(start, stop);
-    			System.out.println(message);
-    			log.info(message);
-    			
-    		}else {
-    			String message = "[" + stop + "] Error occurred while installing Integrity Client. Time duration: " +Utils.timeDuration(start, stop);
-    			System.out.println(message);
-    			log.error(message);
-    			return;
-    		}
-		} catch (IOException e) {
-			log.error(e);
-			log.error("Please check if \""+PROPERTY_NEW_CLIENT_INSTALLATOR_DIR+"\" property is properly set");
-		}
-    	
-    	mainStop = new Timestamp(new java.util.Date().getTime());
     	
     	
 
     
     	
     	// update viewsets
-    	try {
-			replacePortsAndSettings(new File(mksDir + File.separator + "viewset") , "localhost", "7001");
-		} catch (IOException e) {
-			log.error(e);
-		}
+
+    	replacePortsAndSettings(new File(mksDir + File.separator + "viewset" +File.separator+"user") , "localhost", "7001");
+
     	
     
-    	*/
+    	
     	
     		// update sandboxes
     	
@@ -223,6 +150,7 @@ public class App{
     	api.setDefaultServerConnection("localhost");
     	
     	api.endSession();
+    	
     	exitAppSuccessfull();
     }
     
@@ -239,8 +167,9 @@ public class App{
     }
                 
     public static void exitAppSuccessfull(){
-    	System.out.println("Total time duration: " + Utils.timeDuration(mainStart, mainStop)+"\nAll roll-out steps run successfully. Press enter to exit RICT");
-    	log.info("Total time duration: " + Utils.timeDuration(mainStart, mainStop));
+
+    	System.out.println("Total time duration: " + Utils.timeDuration(mainStart)+"\nAll roll-out steps run successfully. Press enter to exit RICT");
+    	log.info("Total time duration: " + Utils.timeDuration(mainStart));
     	try {
 			System.in.read();
 		} catch (IOException e) {
@@ -249,8 +178,8 @@ public class App{
     }
     
     public static void abortApp(){
-    	System.out.println("Total time duration: " + Utils.timeDuration(mainStart, mainStop)+"\nError occurred. Please check log file. Press enter to exit RICT");
-    	log.info("Total time duration: " + Utils.timeDuration(mainStart, mainStop));
+    	System.out.println("Total time duration: " + Utils.timeDuration(mainStart)+"\nError occurred. Please check log file. Press enter to exit RICT");
+    	log.info("Total time duration: " + Utils.timeDuration(mainStart));
     	try {
 			System.in.read();
 		} catch (IOException e) {
@@ -258,124 +187,145 @@ public class App{
 		}
     }
     
-    private static int uninstallIntegrityClient() throws IOException {
-    	String oldClientDir = config.getString(PROPERTY_OLD_CLIENT_DIR) + File.separator + "uninstall" + File.separator + "IntegrityClientUninstall.exe";
-    	String pathToProcess = oldClientDir;
-		File f = new File(pathToProcess);
-		if (!f.exists()){
-			log.error(f.getAbsolutePath() + " doesn't exist, uninstall abort");
-			return -1;
-		}
-		
-		if (oldClientDir.contains("\\")) {
-			oldClientDir = f.getName();
-		}
-		
-	    int numberOfProcesses = WindowsUtils.numberOfRunningProcesses(oldClientDir);
-	    if (numberOfProcesses > 0 ) {
-	    	if (numberOfProcesses == 1){
-	    		log.warn("find already running process "+ oldClientDir + " process will be terminated");
-	    	} else {
-	       		log.warn("find already running "+numberOfProcesses+" \""+ oldClientDir + "\" processes, all of them will be terminated");
-	       		
-	    	}
-	       	WindowsUtils.killProcess(oldClientDir);
-	    }    			
-		
-	    WindowsUtils.startProcess(pathToProcess, null, processWorkTimeLimit , processCheckInterval);
-	    return WindowsUtils.checkExitCode();
-    }
-    
-    private static int installNewIntegrityClient() throws IOException {
-    	//String integrityInstallatorDir = config.getString(PROPERTY_NEW_CLIENT_INSTALLATOR_DIR);
-    	String integrityInstallator = config.getString(PROPERTY_NEW_CLIENT_INSTALLATOR_DIR) + File.separator + "mksclient.exe";
-    	
-    	String propertiesFileName= "mksclient.properties";
-    	
-    	/* Properties prop = new Properties();
-    	prop.setProperty("INSTALLER_UI", "silent");
-    	prop.setProperty("MKS_LICENSE_AGREEMENT", "true");
-    	prop.setProperty("MKS_CREATE_INTEGRITY_CLIENT_SHORTCUT", "true");
-    	prop.setProperty("MKS_CREATE_ADMIN_CLIENT_SHORTCUT", "true");
-    	prop.setProperty("USER_INSTALL_DIR", config.getString(PROPERTY_NEW_CLIENT_DIR));
-    	prop.setProperty("INSTALL_OVERRIDE", "true");
-    	prop.setProperty("MKS_USE_SAME_SERVER", config.getString("MKS_USE_SAME_SERVER"));
-    	prop.setProperty("MKS_COMMON_HOST", config.getString("MKS_COMMON_HOST"));
-    	prop.setProperty("MKS_COMMON_PORT", config.getString("MKS_COMMON_PORT"));
-    	prop.setProperty("MKS_IM_HOST", config.getString("MKS_IM_HOST"));
-    	prop.setProperty("MKS_IM_PORT", config.getString("MKS_IM_PORT"));
-    	prop.setProperty("MKS_SI_HOST", config.getString("MKS_SI_HOST"));
-    	prop.setProperty("MKS_SI_PORT", config.getString("MKS_SI_PORT"));
-    	prop.setProperty("MKS_PRODUCT_LANGUAGE", config.getString("MKS_PRODUCT_LANGUAGE"));
-
-    	File propFile = new File(integrityInstallatorDir+File.separator+propertiesFileName);
-    	OutputStream fos = new FileOutputStream(propFile);
-    	prop.store(fos, "# Integrity Client silent installer properties file.");
-    	
-    	/*
-    	String host, port, imHost, imPort, siHost, siPort;
-    	host = config.getString("MKS_COMMON_HOST");
-    	port = config.getString("MKS_COMMON_PORT");
-    	imHost = config.getString("MKS_IM_HOST");
-    	imPort = config.getString("MKS_IM_PORT");
-    	siHost = config.getString("MKS_SI_HOST");
-    	siPort = config.getString("MKS_SI_PORT");
-    	
-    	if (config.getString("MKS_USE_SAME_SERVER").isEmpty()){
-    		prop.setProperty("MKS_USE_SAME_SERVER", "true");
-    	} else {
-    		prop.setProperty("MKS_USE_SAME_SERVER", config.getString("MKS_USE_SAME_SERVER"));
-    	}
-    	
-    	if (!host.isEmpty()) {
-    	
-    	}
-    	
-    	*/
-
-    
-    	String pathToProcess = integrityInstallator;
-    	
-		if (integrityInstallator.contains("\\")) {
+    private static void uninstallIntegrityClient() {
+    	// UNINSTALL OLD CLIENT
+    	Timestamp start, stop;
+		try {
+	    	start = new Timestamp(new java.util.Date().getTime());
+	    	System.out.println("[" + start + "] Uninstalling old Integrity Client...");
+	    	
+	    	String oldClientDir = config.getString(PROPERTY_OLD_CLIENT_DIR) + File.separator + "uninstall" + File.separator + "IntegrityClientUninstall.exe";
+	    	String pathToProcess = oldClientDir;
 			File f = new File(pathToProcess);
-			integrityInstallator = f.getName();
+			if (!f.exists()){
+				log.error(f.getAbsolutePath() + " doesn't exist, uninstall abort");
+			}
+			
+			if (oldClientDir.contains("\\")) {
+				oldClientDir = f.getName();
+			}
+			
+		    int numberOfProcesses = WindowsUtils.numberOfRunningProcesses(oldClientDir);
+		    if (numberOfProcesses > 0 ) {
+		    	if (numberOfProcesses == 1){
+		    		log.warn("find already running process "+ oldClientDir + " process will be terminated");
+		    	} else {
+		       		log.warn("find already running "+numberOfProcesses+" \""+ oldClientDir + "\" processes, all of them will be terminated");
+		    	}
+		       	WindowsUtils.killProcess(oldClientDir);
+		    }    		
+		    WindowsUtils.startProcess(pathToProcess, null, processWorkTimeLimit , processCheckInterval);
+	    	stop = new Timestamp(new java.util.Date().getTime());
+			if (WindowsUtils.checkExitCode() == 0){
+				String message = "[" + stop + "] Old Integrity Client was successful uninstalled. Time duration: " +Utils.timeDuration(start);
+				WindowsUtils.deleteFolder(new File(config.getString(PROPERTY_OLD_CLIENT_DIR)));
+				System.out.println(message);
+				log.info(message);
+				
+			}else {
+				String message = "[" + stop + "] Error occurred while uninstalling Integrity Client. Time duration: " +Utils.timeDuration(start);
+				System.out.println(message);
+				log.error(message);
+				abortApp(); //TODO uncomment
+			}
+		} catch (IOException e) {
+			log.error(e);
+			log.error("Please check if \""+PROPERTY_OLD_CLIENT_DIR+"\" property is properly set and points to OLD IntegrityClient dir");
 		}
 		
-	    int numberOfProcesses = WindowsUtils.numberOfRunningProcesses(integrityInstallator);
-	    if (numberOfProcesses > 0 ) {
-	    	if (numberOfProcesses == 1){
-	    		log.warn("find already running process "+ integrityInstallator + " process will be terminated");
-	    	} else {
-	       		log.warn("find already running "+numberOfProcesses+" \""+ integrityInstallator + "\" processes, all of them will be terminated");
-	       		
-	    	}
-	       	WindowsUtils.killProcess(integrityInstallator);
-	    }    			
-		
-	    WindowsUtils.startProcess(pathToProcess, "-f "+propertiesFileName, processWorkTimeLimit , processCheckInterval);
-	    return WindowsUtils.checkExitCode();    	
+		File oldClientDir = new File(config.getString(PROPERTY_OLD_CLIENT_DIR));
+		if (oldClientDir!= null && oldClientDir.isDirectory()) {
+			if (WindowsUtils.deleteFolder(oldClientDir)) {
+				log.info("Old client directory ["+oldClientDir.getAbsolutePath()+"] was removed");
+			} else {
+				log.warn("Cannot delete Old Client directory ["+oldClientDir.getAbsolutePath()+"]" );
+			}
+		}
     }
     
-    private static void backUpMksDir(){
-    	File fViewSets = new File(mksDir);
-    	File viewSetsBackup = new File(appDir+File.separator+"mks_backup"+ File.separator+".mks");
+    private static void installNewIntegrityClient() {
+    	// INSTALL NEW CLIENT
+    	Timestamp start, stop;
+    	try {
+        	start = new Timestamp(new java.util.Date().getTime());
+        	System.out.println("[" + start + "] Installing new Integrity Client...");
+        	String integrityInstallator = config.getString(PROPERTY_NEW_CLIENT_INSTALLATOR_DIR) + File.separator + "mksclient.exe";
+        	
+        	String propertiesFileName= "mksclient.properties";   
+        	String pathToProcess = integrityInstallator;
+        	
+    		if (integrityInstallator.contains("\\")) {
+    			File f = new File(pathToProcess);
+    			integrityInstallator = f.getName();
+    		}
+    		
+    	    int numberOfProcesses = WindowsUtils.numberOfRunningProcesses(integrityInstallator);
+    	    if (numberOfProcesses > 0 ) {
+    	    	if (numberOfProcesses == 1){
+    	    		log.warn("find already running process "+ integrityInstallator + " process will be terminated");
+    	    	} else {
+    	       		log.warn("find already running "+numberOfProcesses+" \""+ integrityInstallator + "\" processes, all of them will be terminated");
+    	       		
+    	    	}
+    	       	WindowsUtils.killProcess(integrityInstallator);
+    	    }    			
+    	    WindowsUtils.startProcess(pathToProcess, "-f "+propertiesFileName, processWorkTimeLimit , processCheckInterval);      
+        	stop = new Timestamp(new java.util.Date().getTime());
+    		if (WindowsUtils.checkExitCode() == 0){
+    			String message = "[" + stop + "] New Integrity Client was successful installed. Time duration: " +Utils.timeDuration(start);
+    			System.out.println(message);
+    			log.info(message);
+    			
+    		}else {
+    			String message = "[" + stop + "] Error occurred while installing Integrity Client. Time duration: " +Utils.timeDuration(start);
+    			System.out.println(message);
+    			log.error(message);
+    			return;
+    		}
+		} catch (IOException e) {
+			log.error(e);
+			log.error("Please check if \""+PROPERTY_NEW_CLIENT_INSTALLATOR_DIR+"\" property is properly set");
+		}
+    }
+    
+    private static void backUpMksDirs(){
+    	File mks = new File(mksDir);
+    	File sidist = new File(SIDistDir);
+    	String backupDir = "mks_backups" + File.separator+ new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
     	
-    	WindowsUtils.deleteFolder(viewSetsBackup);
-    	viewSetsBackup.mkdirs();
+    	File mksBackup = new File(appDir+File.separator+backupDir+ File.separator+".mks");
+    	File SIDistBackup = new File(appDir+File.separator+backupDir+File.separator+"SIDist");
     	
-    	if(fViewSets.isDirectory()){
+    	mksBackup.mkdirs();
+    	SIDistBackup.mkdirs();
+    	
+    	if(mks.isDirectory()){
     		try {
-				Utils.copyFolder(fViewSets, viewSetsBackup);
+				Utils.copyFolder(mks, mksBackup);
+				log.info("Directory " +mks+" was copied to "+mksBackup);
 			} catch (IOException e) {
 				log.error(e);
 				e.printStackTrace();
 			}
     	} else {
-    		log.error("Cannot find "+fViewSets.getAbsolutePath() + " viewset directory");
+    		log.error("Cannot find "+mks.getAbsolutePath() + " directory");
     	}
+    	
+    	if(sidist.isDirectory()){
+    		try {
+				Utils.copyFolder(sidist, SIDistBackup);
+				log.info("Directory " +sidist+" was copied to "+SIDistBackup);
+			} catch (IOException e) {
+				log.error(e);
+				e.printStackTrace();
+			}
+    	} else {
+    		log.error("Cannot find "+sidist.getAbsolutePath() + " directory");
+    	}
+    	
     }
     
-    private static void replacePortsAndSettings(File dir, String hostname, String port) throws IOException {
+    private static void replacePortsAndSettings(File dir, String hostname, String port){
     	
 	   	 String p1 = "<Setting name=\"server.port\">";
 	   	 String p3 = "<Setting name=\"server.hostname\">";
@@ -393,29 +343,29 @@ public class App{
     	}
     	
     	File[] arrayOfDirs = dir.listFiles();
-    	
-    	for (File directory : arrayOfDirs) {
-	    	File[] arrayOfViewsets = directory.listFiles();
-	    	
-	    	for (File viewset : arrayOfViewsets) {
-	    		
-	    		FileInputStream fs = new FileInputStream(viewset.getAbsoluteFile());
-	    		BufferedReader br = new BufferedReader(new InputStreamReader(fs));
-	    		FileWriter writer = new FileWriter(viewset.getAbsoluteFile());
-	    		
-	    		String line = br.readLine();
-	    		while (line != null) {
-	    			line = line.replaceAll(portRegex, portSetting);
-	    			line = line.replaceAll(hostRegex, hostSetting);
-	    			writer.write(line);
-	    			writer.write(System.getProperty("line.separator"));
-	    			line = br.readLine();
-	    		}
-	    		writer.flush();
-	    		writer.close();	
-	    		br.close();
-	    		fs.close();
-	    	}    		
+    	try {
+		    	File[] arrayOfViewsets = dir.listFiles();
+		    	for (File viewset : arrayOfViewsets) {
+		    		
+		    		FileInputStream fs = new FileInputStream(viewset.getAbsoluteFile());
+		    		BufferedReader br = new BufferedReader(new InputStreamReader(fs));
+		    		FileWriter writer = new FileWriter(viewset.getAbsoluteFile());
+		    		
+		    		String line = br.readLine();
+		    		while (line != null) {
+		    			line = line.replaceAll(portRegex, portSetting);
+		    			line = line.replaceAll(hostRegex, hostSetting);
+		    			writer.write(line);
+		    			writer.write(System.getProperty("line.separator"));
+		    			line = br.readLine();
+		    		}
+		    		writer.flush();
+		    		writer.close();	
+		    		br.close();
+		    		fs.close();
+		    	}    		
+    	} catch (IOException e) {
+    		log.error(e);
     	}
 
     }

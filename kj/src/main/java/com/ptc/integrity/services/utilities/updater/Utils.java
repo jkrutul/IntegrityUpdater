@@ -14,10 +14,8 @@ import org.apache.log4j.Logger;
 public class Utils {
 	static final Logger log = LogManager.getLogger(Utils.class.getName());
 
-	public static String timeDuration(Timestamp start, Timestamp stop) {
-		if (stop == null){
-	        stop = new Timestamp(new java.util.Date().getTime());
-		}
+	public static String timeDuration(Timestamp start) {
+	    Timestamp stop = new Timestamp(new java.util.Date().getTime());
 		long diff = stop.getTime() - start.getTime();
 		long diffSeconds = diff / 1000 % 60;
 		long diffMinutes = diff / (60 * 1000) % 60;
@@ -43,7 +41,7 @@ public class Utils {
 			// if directory not exists, create it
 			if (!dest.exists()) {
 				dest.mkdir();
-				log.info("Directory copied from " + src + "  to " + dest);
+				//log.info("Directory copied from " + src + "  to " + dest);
 			}
 
 			// list all the directory contents

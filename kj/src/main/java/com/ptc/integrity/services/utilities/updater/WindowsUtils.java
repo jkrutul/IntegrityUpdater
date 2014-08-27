@@ -105,16 +105,14 @@ public class WindowsUtils {
     		if (WindowsUtils.ifProcessRunning(processName)){
     			log.info("Process \"" + processName+"\" is still running");        		
     		} else {
-        		stop = new Timestamp(new java.util.Date().getTime());
-        		String timeDuraton = Utils.timeDuration(start, stop);
+        		String timeDuraton = Utils.timeDuration(start);
        			log.info("Process \"" + processName +"\"  sucessful end his work. Process time duration: " + timeDuraton);
         		
     			break;
     		}
 
     		if ( counter > limit ) {
-        		stop = new Timestamp(new java.util.Date().getTime());
-        		String timeDuraton = Utils.timeDuration(start, stop);
+        		String timeDuraton = Utils.timeDuration(start);
         		log.error("Process \"" + processName+"\" is exceed execution limit and will be terminated.");  
     			process.destroy();
     			log.error("Process \"" + processName+"\" has been terminated. Process time duration: " + timeDuraton);
