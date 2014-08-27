@@ -2,14 +2,16 @@ package com.ptc.integrity.services.utilities.updater;
 
 
 import java.io.BufferedReader;
+import java.io.Console;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Timestamp;
-import java.util.Scanner;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.apache.commons.configuration.CompositeConfiguration;
@@ -19,22 +21,33 @@ import org.apache.commons.configuration.SystemConfiguration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
+import com.mks.api.CmdRunner;
+import com.mks.api.Command;
+import com.mks.api.IntegrationPoint;
+import com.mks.api.IntegrationPointFactory;
+import com.mks.api.Session;
+import com.mks.api.response.APIException;
+import com.mks.api.response.Field;
+import com.mks.api.response.Response;
+import com.mks.api.response.WorkItem;
+import com.mks.api.response.WorkItemIterator;
+import com.mks.api.util.APIVersion;
+import com.ptc.integrity.services.utilities.models.Sandbox;
+
 /**
  * Hello world!
  *
  */
 public class App{
 	public static final String PROPERTIES_FILE = "rict.properties";
-	//public static final String PROPERTY_NEW_CLIENT_DIR = "NEW_CLIENT_INSTALL_DIR";
 	public static final String PROPERTY_OLD_CLIENT_DIR = "OLD_CLIENT_DIR";
-	public static final String PROPERTY_OLD_CLIENT_UNINSTALLATOR = "OLD_CLIENT_UNINSTALL_APP";
 	public static final String PROPERTY_NEW_CLIENT_INSTALLATOR_DIR = "NEW_CLIENT_INSTALL_APP_DIR";
 	public static final String PROPERTY_PROCESS_WORK_TIME_LIMIT = "WORKING_TIME_LIMIT_OF_PROCESS";
 	public static final String PROPERTY_PROCESS_CHECK_TIME_INTERVAL = "PROCESS_CHECK_INTERVAL";
-	public static final String PROPERTY_SERVER_HOSTNAME = "NEW_SERVER_HOSTNAME";
+	public static final String PROPERTY_SERVER_HOSTNAME = "SERVER_HOSTNAME";
 	public static final String PROPERTY_SERVER_PORT = "SERVER_PORT";
 	
-	public static String oldClientDir, installAppDir, appDir, userHome, mksDir;
+	public static String oldClientDir, installAppDir, appDir, userHome, mksDir, serverHostname, serverPort;
 	
 	public static CompositeConfiguration config;
 	static final Logger log = LogManager.getLogger(App.class.getName());
@@ -43,6 +56,7 @@ public class App{
 	private static int processCheckInterval = 10;
 	
 	private static Timestamp mainStart, mainStop;
+	private static APIUtils api;
 	
 	static {
 		log.info("********** Rollout Integrity Client Tool **********");
@@ -75,13 +89,15 @@ public class App{
 		processCheckInterval = config.getInt(PROPERTY_PROCESS_CHECK_TIME_INTERVAL, 10);
 		oldClientDir = config.getString(PROPERTY_OLD_CLIENT_DIR);
 		installAppDir = config.getString(PROPERTY_NEW_CLIENT_INSTALLATOR_DIR);
-		
+		serverHostname = config.getString(PROPERTY_SERVER_HOSTNAME);
+		serverPort = config.getString(PROPERTY_SERVER_PORT);
+		api = new APIUtils();
 	
 	}
 	
     public static void main( String[] args ) throws InterruptedException {    	
     	
-    	
+    	/*
     	Runtime runTime = Runtime.getRuntime();
     	Process process;
     	try {
@@ -97,15 +113,17 @@ public class App{
 			e1.printStackTrace();
 		}
 		
+		*/
+		
     	
         mainStart = new Timestamp(new java.util.Date().getTime());
         
-        //TODO uncomment
+        /*
     	if( !checkProperties()) {
     		abortApp();
     	}
     	
-    	//*/
+    	*/
          
     	Timestamp start, stop;
 
@@ -116,7 +134,7 @@ public class App{
     	}
     	
     	backUpMksDir();
-    	
+    	/*
     	// UNINSTALL CLIENT
     	try {
         	start = new Timestamp(new java.util.Date().getTime());
@@ -137,7 +155,7 @@ public class App{
     		}
 		} catch (IOException e) {
 			log.error(e);
-			log.error("Please check if \""+PROPERTY_OLD_CLIENT_UNINSTALLATOR+"\" property is properly set and points to OLD IntegrityClient dir");
+			log.error("Please check if \""+PROPERTY_OLD_CLIENT_DIR+"\" property is properly set and points to OLD IntegrityClient dir");
 		}
     	
     	File oldClientDir = new File(config.getString(PROPERTY_OLD_CLIENT_DIR));
@@ -176,8 +194,7 @@ public class App{
     	
     	
 
-    	// update sandboxes
-    	
+    
     	
     	// update viewsets
     	try {
@@ -186,12 +203,41 @@ public class App{
 			log.error(e);
 		}
     	
+    
+    	*/
+    	
+    		// update sandboxes
+    	
+    	
+    	
+    	String userName = readFromConsole("Enter User Name:");
+    	String password = readFromConsole("Enter your password:");
+    	api.connectToIntegrity(userName, password);
+    	List<String> sandboxes = api.getSanboxesRegisteredTo("localhost");
+    	/*for (String sandbox : sandboxes) {
+    		log.info("Found Sandbox: " + sandbox);
+    	}
+    	api.dropSanboxes(sandboxes);
+    	api.reImportSandboxes(sandboxes, "admin", "admin", "192.168.153.29", "7001");
+		*/
+    	api.setDefaultServerConnection("localhost");
+    	
+    	api.endSession();
     	exitAppSuccessfull();
-    		
     }
     
-    
-    
+    private static String readFromConsole(String message){
+    	 BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+         System.out.print(message);
+         try {
+			return br.readLine();
+		} catch (IOException e) {
+			log.error(e);
+		}
+		return null;
+
+    }
+                
     public static void exitAppSuccessfull(){
     	System.out.println("Total time duration: " + Utils.timeDuration(mainStart, mainStop)+"\nAll roll-out steps run successfully. Press enter to exit RICT");
     	log.info("Total time duration: " + Utils.timeDuration(mainStart, mainStop));
@@ -213,7 +259,7 @@ public class App{
     }
     
     private static int uninstallIntegrityClient() throws IOException {
-    	String oldClientDir = config.getString(PROPERTY_OLD_CLIENT_UNINSTALLATOR);
+    	String oldClientDir = config.getString(PROPERTY_OLD_CLIENT_DIR) + File.separator + "uninstall" + File.separator + "IntegrityClientUninstall.exe";
     	String pathToProcess = oldClientDir;
 		File f = new File(pathToProcess);
 		if (!f.exists()){
