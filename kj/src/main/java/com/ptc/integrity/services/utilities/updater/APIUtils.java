@@ -133,6 +133,16 @@ public class APIUtils {
     	}
     }
     
+    public static void exitIntegrityClient() throws InterruptedException{
+    	try {
+			Process p = Runtime.getRuntime().exec("cmd /c im exit --noshutdown");
+    		//Process p = Runtime.getRuntime().exec("im exit --noshutdown");
+			p.waitFor();
+		} catch (IOException e1) {
+			log.error(e1);
+		}
+    }
+    
     public void setDefaultServerConnection(String servername) throws InterruptedException{
     	
     	try {

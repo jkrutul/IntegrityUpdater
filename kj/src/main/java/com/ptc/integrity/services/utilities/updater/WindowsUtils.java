@@ -80,7 +80,8 @@ public class WindowsUtils {
     	try {
 	    	String command;
 	    	if (processParams != null){
-	    		command = "cmd /c "+pathToProcess+" "+ processParams;
+	    		command = "cmd /c "+pathToProcess+" "+ processParams; //TODO uncomment
+	    		//command = pathToProcess+" "+ processParams;
 	    		process = runTime.exec(command);
 	    	} else {
 	    		command = "cmd /c "+pathToProcess;

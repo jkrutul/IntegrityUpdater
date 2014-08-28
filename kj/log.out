@@ -1,10 +1,16 @@
-[2014-08-27 17:04:50] [updater.App] [INFO ] ********** Rollout Integrity Client Tool **********
-[2014-08-27 17:04:51] [configuration.ConfigurationUtils] [DEBUG] ConfigurationUtils.locate(): base is C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj, name is rict.properties
-[2014-08-27 17:04:51] [configuration.ConfigurationUtils] [DEBUG] Loading configuration from the path C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj\rict.properties
-[2014-08-27 17:04:51] [updater.App] [DEBUG] Added configuration from: C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj\rict.properties
-[2014-08-27 17:05:07] [updater.App] [INFO ] Found old Client app directory [C:\Program Files\Integrity\IntegrityClient10]
-[2014-08-27 17:05:07] [updater.App] [INFO ] Found mksclinet.exe
-[2014-08-27 17:05:07] [updater.App] [INFO ] Found mksclient.properties
-[2014-08-27 17:05:08] [updater.App] [INFO ] Directory C:\Documents and Settings\Administrator\.mks was copied to C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj\mks_backups\2014_08_27_17_05_07\.mks
-[2014-08-27 17:05:08] [updater.App] [INFO ] Directory C:\Documents and Settings\Administrator\SIDist was copied to C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj\mks_backups\2014_08_27_17_05_07\SIDist
-[2014-08-27 17:05:08] [updater.App] [ERROR] C:\Program Files\Integrity\IntegrityClient10\uninstall\IntegrityClientUninstall.exe doesn't exist, uninstall abort
+[2014-08-28 12:14:09] [updater.App] [INFO ] ********** Rollout Integrity Client Tool **********
+[2014-08-28 12:14:09] [configuration.ConfigurationUtils] [DEBUG] ConfigurationUtils.locate(): base is C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj, name is rict.properties
+[2014-08-28 12:14:09] [configuration.ConfigurationUtils] [DEBUG] Loading configuration from the path C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj\rict.properties
+[2014-08-28 12:14:09] [updater.App] [DEBUG] Added configuration from: C:\Documents and Settings\Administrator\git\IntegrityUpdater2\kj\rict.properties
+[2014-08-28 12:14:23] [updater.App] [INFO ] Found old Client app directory [C:\Program Files\Integrity\IntegrityClient10]
+[2014-08-28 12:14:23] [updater.App] [INFO ] Found mksclinet.exe
+[2014-08-28 12:14:23] [updater.App] [INFO ] Found mksclient.properties
+[2014-08-28 12:14:23] [configuration.ConfigurationUtils] [DEBUG] ConfigurationUtils.locate(): base is C:\Documents and Settings\Administrator\Desktop\IntegrityClientInstaller, name is mksclient.properties
+[2014-08-28 12:14:23] [configuration.ConfigurationUtils] [DEBUG] Loading configuration from the path C:\Documents and Settings\Administrator\Desktop\IntegrityClientInstaller\mksclient.properties
+[2014-08-28 12:14:38] [updater.WindowsUtils] [INFO ] Process: C:\Program Files\Integrity\IntegrityClient10\bin\PatchClient.exe was started at: 2014-08-28 12:14:31.563
+[2014-08-28 12:14:42] [updater.WindowsUtils] [INFO ] Process "PatchClient.exe"  sucessful end his work. Process time duration: 00:00:11s 
+[2014-08-28 12:14:46] [updater.WindowsUtils] [INFO ] Process: C:\Program Files\Integrity\IntegrityClient10\bin\PatchClient.exe was started at: 2014-08-28 12:14:46.923
+[2014-08-28 12:14:51] [updater.WindowsUtils] [INFO ] Process "PatchClient.exe" is still running
+[2014-08-28 12:14:55] [updater.WindowsUtils] [INFO ] Process "PatchClient.exe"  sucessful end his work. Process time duration: 00:00:08s 
+[2014-08-28 12:14:55] [updater.WindowsUtils] [INFO ] Process: C:\Program Files\Integrity\IntegrityClient10\bin\PatchClient.exe was started at: 2014-08-28 12:14:55.079
+[2014-08-28 12:14:59] [updater.WindowsUtils] [INFO ] Process "PatchClient.exe"  sucessful end his work. Process time duration: 00:00:04s 

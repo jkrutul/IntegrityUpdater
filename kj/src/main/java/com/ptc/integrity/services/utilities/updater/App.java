@@ -2,16 +2,23 @@ package com.ptc.integrity.services.utilities.updater;
 
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
+import java.util.Scanner;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.configuration.CompositeConfiguration;
@@ -33,8 +40,12 @@ public class App{
 	public static final String PROPERTY_PROCESS_CHECK_TIME_INTERVAL = "PROCESS_CHECK_INTERVAL";
 	public static final String PROPERTY_SERVER_HOSTNAME = "SERVER_HOSTNAME";
 	public static final String PROPERTY_SERVER_PORT = "SERVER_PORT";
+	public static final String PROPERTY_OLD_SERVER_HOSTNAMES = "OLD_SERVER_HOSTNAMES";
+	public static final String PROPERTY_HOTFIXES_DIR = "HOTFIXES_DIR";
 	
-	public static String oldClientDir, installAppDir, appDir, userHome, mksDir, SIDistDir, serverHostname, serverPort;
+	public static String oldClientDir, installAppDir, appDir, userHome, mksDir, SIDistDir, serverHostname, serverPort, newIntegrityClientDir, hotfixesDir;
+	public static List<String> oldServerHostnames;
+	public static PropertiesConfiguration clientInstallProp;
 	
 	public static CompositeConfiguration config;
 	static final Logger log = LogManager.getLogger(App.class.getName());
@@ -74,80 +85,59 @@ public class App{
 		}
 		
 		processWorkTimeLimit = config.getInt(PROPERTY_PROCESS_WORK_TIME_LIMIT, 60*20);
-		processCheckInterval = config.getInt(PROPERTY_PROCESS_CHECK_TIME_INTERVAL, 10);
+		processCheckInterval = config.getInt(PROPERTY_PROCESS_CHECK_TIME_INTERVAL, 4);
 		oldClientDir = config.getString(PROPERTY_OLD_CLIENT_DIR);
 		installAppDir = config.getString(PROPERTY_NEW_CLIENT_INSTALLATOR_DIR);
 		serverHostname = config.getString(PROPERTY_SERVER_HOSTNAME);
 		serverPort = config.getString(PROPERTY_SERVER_PORT);
+		oldServerHostnames = config.getList(PROPERTY_OLD_SERVER_HOSTNAMES);
+		hotfixesDir = config.getString(PROPERTY_HOTFIXES_DIR,installAppDir + File.separator+"hotfixes");
+		
 		api = new APIUtils();
 	
 	}
 	
     public static void main( String[] args ) throws InterruptedException {    	
-    	
-    	/*
-    	Runtime runTime = Runtime.getRuntime();
-    	Process process;
-    	try {
-    		process = runTime.exec("cmd /c C:\\MKS\\IntegrityClient\\uninstall\\IntegrityClientUninstall.exe");
-    		Thread.sleep(10000);
-    		if(WindowsUtils.ifProcessRunning("IntegrityClient.exe")){
-    			System.out.println("Process running");
-    			process.waitFor();
-    		}
 
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		
-		*/
-		
-    	
         mainStart = new Timestamp(new java.util.Date().getTime());
 
     	if( !checkProperties()) {
     		abortApp();
     	}
-
-    	if (WindowsUtils.ifProcessRunning("IntegrityClient.exe")) {
-    		WindowsUtils.killProcess("IntegrityClient.exe");
-    		log.info("Find running IntegrityClient, process will be terminated");
-    	}
+/*
     	
+    	if (WindowsUtils.ifProcessRunning("IntegrityClient.exe")) {
+    		APIUtils.exitIntegrityClient();
+    		log.info("Exiting client");
+    		if (WindowsUtils.ifProcessRunning("IntegrityClient.exe")) {
+    			WindowsUtils.killProcess("IntegrityClient.exe");
+    		}
+
+    	}
+		*/
+        String userName = readFromConsole("Enter User Name:");
+    	String password = readFromConsole("Enter your password:");
     	backUpMksDirs();
+
     	uninstallIntegrityClient();
     	installNewIntegrityClient();
-    	
 
-    	
-    	
-
-    
-    	
+    	installHotfixes();
     	// update viewsets
+    	replaceViewsetsSettings(new File(mksDir + File.separator + "viewset" +File.separator+"user") , serverHostname, "7001");
 
-    	replacePortsAndSettings(new File(mksDir + File.separator + "viewset" +File.separator+"user") , "localhost", "7001");
-
-    	
-    
-    	
-    	
-    		// update sandboxes
-    	
-    	
-    	
-    	String userName = readFromConsole("Enter User Name:");
-    	String password = readFromConsole("Enter your password:");
+    	// update sandboxes
     	api.connectToIntegrity(userName, password);
-    	List<String> sandboxes = api.getSanboxesRegisteredTo("localhost");
-    	/*for (String sandbox : sandboxes) {
-    		log.info("Found Sandbox: " + sandbox);
+    	for ( String oldHostname : oldServerHostnames) {
+    		List<String> sandboxes = api.getSanboxesRegisteredTo(oldHostname);
+        	for (String sandbox : sandboxes) {
+        		log.info("Found Sandbox: " + sandbox + " on " +oldHostname);
+        	}
+        	api.dropSanboxes(sandboxes);
+        	api.reImportSandboxes(sandboxes, userName, password, serverHostname, "7001");
     	}
-    	api.dropSanboxes(sandboxes);
-    	api.reImportSandboxes(sandboxes, "admin", "admin", "192.168.153.29", "7001");
-		*/
-    	api.setDefaultServerConnection("localhost");
+    	
+    	api.setDefaultServerConnection(serverHostname);
     	
     	api.endSession();
     	
@@ -165,16 +155,46 @@ public class App{
 		return null;
 
     }
-                
+     
     public static void exitAppSuccessfull(){
 
     	System.out.println("Total time duration: " + Utils.timeDuration(mainStart)+"\nAll roll-out steps run successfully. Press enter to exit RICT");
     	log.info("Total time duration: " + Utils.timeDuration(mainStart));
     	try {
 			System.in.read();
+			System.exit(0);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+    }
+    
+    public static void installHotfixes(){
+    	Timestamp start;
+	    start = new Timestamp(new java.util.Date().getTime());
+	    System.out.println("[" + start + "] Installing hotfixes...");
+	    String pathToPatchClient = newIntegrityClientDir +File.separator +"bin"+File.separator+"PatchClient.exe";
+
+	    
+	    File patchClient = new File(pathToPatchClient);
+	    if (!patchClient.exists() ){
+	    	log.error("PatchClient.exe not found under: "+pathToPatchClient );
+	    	return;
+	    }
+	   
+	    File hotfixesFolder = new File(hotfixesDir);
+	    File[] hotfixes = hotfixesFolder.listFiles();
+
+	    for ( File hotfix : hotfixes) {
+	    	try {
+				WindowsUtils.startProcess(pathToPatchClient, "\""+hotfix.getAbsolutePath()+"\"", processWorkTimeLimit, processCheckInterval);
+			} catch (IOException e) {
+				log.error(e);
+				abortApp();
+			}	    	
+	    }
+	    
+	
+	    	
     }
     
     public static void abortApp(){
@@ -182,6 +202,7 @@ public class App{
     	log.info("Total time duration: " + Utils.timeDuration(mainStart));
     	try {
 			System.in.read();
+			System.exit(-1);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -214,7 +235,7 @@ public class App{
 		    	}
 		       	WindowsUtils.killProcess(oldClientDir);
 		    }    		
-		    WindowsUtils.startProcess(pathToProcess, null, processWorkTimeLimit , processCheckInterval);
+		    WindowsUtils.startProcess(pathToProcess, "-i silent", processWorkTimeLimit , processCheckInterval);
 	    	stop = new Timestamp(new java.util.Date().getTime());
 			if (WindowsUtils.checkExitCode() == 0){
 				String message = "[" + stop + "] Old Integrity Client was successful uninstalled. Time duration: " +Utils.timeDuration(start);
@@ -292,10 +313,12 @@ public class App{
     	File mks = new File(mksDir);
     	File sidist = new File(SIDistDir);
     	String backupDir = "mks_backups" + File.separator+ new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
-    	
+
     	File mksBackup = new File(appDir+File.separator+backupDir+ File.separator+".mks");
     	File SIDistBackup = new File(appDir+File.separator+backupDir+File.separator+"SIDist");
     	
+    	System.out.println("Backuping .mks, SIDist folders to " + appDir+File.separator+backupDir);
+    	log.info("Backuping .mks, SIDist folders to " + appDir+File.separator+backupDir);
     	mksBackup.mkdirs();
     	SIDistBackup.mkdirs();
     	
@@ -325,27 +348,59 @@ public class App{
     	
     }
     
-    private static void replacePortsAndSettings(File dir, String hostname, String port){
+    private static void replaceViewsetsSettings(File dir, String hostname, String port){
     	
-	   	 String p1 = "<Setting name=\"server.port\">";
+	   	 //String p1 = "<Setting name=\"server.port\">";
 	   	 String p3 = "<Setting name=\"server.hostname\">";
 	   	 String p2 = "</Setting>";
 	   	 
 	   	 String hostSetting = p3 + hostname + p2;
-	   	 String portSetting = p1 + port +p2;
+	   	// String portSetting = p1 + port +p2;
 	   	 
-	   	 String portRegex = Pattern.quote(p1) + "(.*?)"  + Pattern.quote(p2);
+	   	// String portRegex = Pattern.quote(p1) + "(.*?)"  + Pattern.quote(p2);
 	   	 String hostRegex = Pattern.quote(p3) + "(.*?)"  + Pattern.quote(p2);
+	   	 
+	   	 Pattern hostPattern = Pattern.compile(hostRegex);
+	   	// Pattern portPatter = Pattern.compile(portRegex);
+
 
     	if (!dir.isDirectory()) {
-    		log.error("Error while replacing hostnames and ports in viewsets directory " + dir.getAbsolutePath() + " doesn't exists");
+    		log.error("Error while replacing hostnames and ports in viewsets directory. The directory " + dir.getAbsolutePath() + " doesn't exists");
     		return;
     	}
     	
-    	File[] arrayOfDirs = dir.listFiles();
     	try {
 		    	File[] arrayOfViewsets = dir.listFiles();
 		    	for (File viewset : arrayOfViewsets) {
+		    		String tmpFile = dir+File.separator+"tmp_"+viewset.getName();
+		    		BufferedWriter tmpBw = new BufferedWriter(new FileWriter(tmpFile));
+		    		
+		    		try {
+		    			Scanner sc = new Scanner(viewset);
+		    			String line; 
+		    			while(sc.hasNextLine()) {
+		    				line = sc.nextLine();
+			    		   	Matcher hostMatcher = hostPattern.matcher(line);
+			    		   	if (hostMatcher.find()) {
+			    		   		String oldHostname = hostMatcher.group(1);
+			    		   		if (oldServerHostnames.contains(oldHostname)) {
+			    		   			log.info("Replacing hostname in file: " + viewset.getName() + "[OLD Value: "+line.trim() + " -> NEW Value: " + hostSetting+" ]");
+			    		   			line = hostSetting;
+			    		   		}
+			    		   	}
+		    				tmpBw.write(line+"\n");
+		    			}
+		    			sc.close();
+		    			tmpBw.flush();
+		    			tmpBw.close();
+		    		} catch (FileNotFoundException e){
+		    			log.error(e);
+		    		} 
+		    		
+		    		viewset.delete();
+		    		File newFile = new File(tmpFile);
+		    		newFile.renameTo(viewset);
+		    		/*
 		    		
 		    		FileInputStream fs = new FileInputStream(viewset.getAbsoluteFile());
 		    		BufferedReader br = new BufferedReader(new InputStreamReader(fs));
@@ -353,8 +408,17 @@ public class App{
 		    		
 		    		String line = br.readLine();
 		    		while (line != null) {
-		    			line = line.replaceAll(portRegex, portSetting);
-		    			line = line.replaceAll(hostRegex, hostSetting);
+		    		   	Matcher hostMatcher = hostPattern.matcher(line);
+		    		   	if (hostMatcher.find()) {
+		    		   		String oldHostname = hostMatcher.group(1);
+		    		   		if (oldServerHostnames.contains(oldHostname)) {
+		    		   			//line = line.replaceAll(hostRegex, hostSetting)
+		    		   			log.info("Replacing hostname in file: " + viewset.getName() + "[OLD Value: "+line + " -> NEW Value: " + hostSetting);
+		    		   			line = hostSetting;
+		    		   		}
+		    		   	}
+		    			//line = line.replaceAll(portRegex, portSetting);
+		    			// line = line.replaceAll(hostRegex, hostSetting);
 		    			writer.write(line);
 		    			writer.write(System.getProperty("line.separator"));
 		    			line = br.readLine();
@@ -363,7 +427,10 @@ public class App{
 		    		writer.close();	
 		    		br.close();
 		    		fs.close();
-		    	}    		
+		    	}   
+		    	
+		    	 		*/
+		    	}
     	} catch (IOException e) {
     		log.error(e);
     	}
@@ -391,6 +458,12 @@ public class App{
     		}
     		if (mksprop.exists()) {
     			log.info("Found mksclient.properties");
+    			try {
+					clientInstallProp = new PropertiesConfiguration(mksprop);
+					newIntegrityClientDir = clientInstallProp.getString("USER_INSTALL_DIR");
+				} catch (ConfigurationException e) {
+					e.printStackTrace();
+				}
     		} else {
     			log.error("Can't find mksclient.properties in the specified folder ["+mksprop.getAbsolutePath()+"]");
     		}
